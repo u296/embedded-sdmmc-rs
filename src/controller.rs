@@ -39,6 +39,7 @@ where
     /// controller we can open volumes (partitions) and with those we can open
     /// files.
     pub fn new(block_device: D, timesource: T) -> Controller<D, T, MAX_DIRS, MAX_FILES> {
+        #[cfg(feature = "log")]
         debug!("Creating new embedded-sdmmc::Controller");
         Controller {
             block_device,
@@ -400,6 +401,7 @@ where
         dir: &Directory,
         name: &str,
     ) -> Result<(), Error<D::Error>> {
+        #[cfg(feature = "log")]
         debug!(
             "delete_file(volume={:?}, dir={:?}, filename={:?}",
             volume, dir, name
@@ -483,9 +485,11 @@ where
                 VolumeType::Fat(fat) => fat.alloc_cluster(self, None, false)?,
             };
             file.entry.cluster = file.starting_cluster;
+            #[cfg(feature = "log")]
             debug!("Alloc first cluster {:?}", file.starting_cluster);
         }
         if (file.current_cluster.1).0 < file.starting_cluster.0 {
+            #[cfg(feature = "log")]
             debug!("Rewinding to start");
             file.current_cluster = (0, file.starting_cluster);
         }
@@ -496,6 +500,7 @@ where
 
         while written < bytes_to_write {
             let mut current_cluster = file.current_cluster;
+            #[cfg(feature = "log")]
             debug!(
                 "Have written bytes {}/{}, finding cluster {:?}",
                 written, bytes_to_write, current_cluster
@@ -503,6 +508,7 @@ where
             let (block_idx, block_offset, block_avail) =
                 match self.find_data_on_disk(volume, &mut current_cluster, file.current_offset) {
                     Ok(vars) => {
+                        #[cfg(feature = "log")]
                         debug!(
                             "Found block_idx={:?}, block_offset={:?}, block_avail={}",
                             vars.0, vars.1, vars.2
@@ -510,6 +516,7 @@ where
                         vars
                     }
                     Err(Error::EndOfFile) => {
+                        #[cfg(feature = "log")]
                         debug!("Extending file");
                         match &mut volume.volume_type {
                             VolumeType::Fat(ref mut fat) => {
@@ -519,6 +526,7 @@ where
                                 {
                                     return Ok(written);
                                 }
+                                #[cfg(feature = "log")]
                                 debug!("Allocated new FAT cluster, finding offsets...");
                                 let new_offset = self
                                     .find_data_on_disk(
@@ -527,6 +535,7 @@ where
                                         file.current_offset,
                                     )
                                     .map_err(|_| Error::AllocationError)?;
+                                #[cfg(feature = "log")]
                                 debug!("New offset {:?}", new_offset);
                                 new_offset
                             }
@@ -537,6 +546,7 @@ where
             let mut blocks = [Block::new()];
             let to_copy = core::cmp::min(block_avail, bytes_to_write - written);
             if block_offset != 0 {
+                #[cfg(feature = "log")]
                 debug!("Partial block write");
                 self.block_device
                     .read(&mut blocks, block_idx, "read")
@@ -545,6 +555,7 @@ where
             let block = &mut blocks[0];
             block[block_offset..block_offset + to_copy]
                 .copy_from_slice(&buffer[written..written + to_copy]);
+            #[cfg(feature = "log")]
             debug!("Writing block {:?}", block_idx);
             self.block_device
                 .write(&blocks, block_idx)
@@ -557,10 +568,12 @@ where
             file.seek_from_current(to_copy).unwrap();
             file.entry.attributes.set_archive(true);
             file.entry.mtime = self.timesource.get_timestamp();
+            #[cfg(feature = "log")]
             debug!("Updating FAT info sector");
             match &mut volume.volume_type {
                 VolumeType::Fat(fat) => {
                     fat.update_info_sector(self)?;
+                    #[cfg(feature = "log")]
                     debug!("Updating dir entry");
                     self.write_entry_to_disk(fat.get_fat_type(), &file.entry)?;
                 }

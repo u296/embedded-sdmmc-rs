@@ -759,18 +759,22 @@ impl FatVolume {
         match &self.fat_specific_info {
             FatSpecificInfo::Fat16(_fat16_info) => {
                 while current_cluster.0 < end_cluster.0 {
+                    #[cfg(feature = "log")]
                     trace!(
                         "current_cluster={:?}, end_cluster={:?}",
                         current_cluster,
                         end_cluster
                     );
                     let fat_offset = current_cluster.0 * 2;
+                    #[cfg(feature = "log")]
                     trace!("fat_offset = {:?}", fat_offset);
                     let this_fat_block_num =
                         self.lba_start + self.fat_start.offset_bytes(fat_offset);
+                    #[cfg(feature = "log")]
                     trace!("this_fat_block_num = {:?}", this_fat_block_num);
                     let mut this_fat_ent_offset = usize::try_from(fat_offset % Block::LEN_U32)
                         .map_err(|_| Error::ConversionError)?;
+                    #[cfg(feature = "log")]
                     trace!("Reading block {:?}", this_fat_block_num);
                     controller
                         .block_device
@@ -791,18 +795,22 @@ impl FatVolume {
             }
             FatSpecificInfo::Fat32(_fat32_info) => {
                 while current_cluster.0 < end_cluster.0 {
+                    #[cfg(feature = "log")]
                     trace!(
                         "current_cluster={:?}, end_cluster={:?}",
                         current_cluster,
                         end_cluster
                     );
                     let fat_offset = current_cluster.0 * 4;
+                    #[cfg(feature = "log")]
                     trace!("fat_offset = {:?}", fat_offset);
                     let this_fat_block_num =
                         self.lba_start + self.fat_start.offset_bytes(fat_offset);
+                    #[cfg(feature = "log")]
                     trace!("this_fat_block_num = {:?}", this_fat_block_num);
                     let mut this_fat_ent_offset = usize::try_from(fat_offset % Block::LEN_U32)
                         .map_err(|_| Error::ConversionError)?;
+                    #[cfg(feature = "log")]
                     trace!("Reading block {:?}", this_fat_block_num);
                     controller
                         .block_device
@@ -822,6 +830,7 @@ impl FatVolume {
                 }
             }
         }
+        #[cfg(feature = "log")]
         warn!("Out of space...");
         Err(Error::NotEnoughSpace)
     }
@@ -837,12 +846,14 @@ impl FatVolume {
         D: BlockDevice,
         T: TimeSource,
     {
+        #[cfg(feature = "log")]
         debug!("Allocating new cluster, prev_cluster={:?}", prev_cluster);
         let end_cluster = Cluster(self.cluster_count + RESERVED_ENTRIES);
         let start_cluster = match self.next_free_cluster {
             Some(cluster) if cluster.0 < end_cluster.0 => cluster,
             _ => Cluster(RESERVED_ENTRIES),
         };
+        #[cfg(feature = "log")]
         trace!(
             "Finding next free between {:?}..={:?}",
             start_cluster,
@@ -852,6 +863,7 @@ impl FatVolume {
         {
             Ok(cluster) => cluster,
             Err(_) if start_cluster.0 > RESERVED_ENTRIES => {
+                #[cfg(feature = "log")]
                 debug!(
                     "Retrying, finding next free between {:?}..={:?}",
                     Cluster(RESERVED_ENTRIES),
@@ -863,6 +875,7 @@ impl FatVolume {
         };
         self.update_fat(controller, new_cluster, Cluster::END_OF_FILE)?;
         if let Some(cluster) = prev_cluster {
+            #[cfg(feature = "log")]
             trace!(
                 "Updating old cluster {:?} to {:?} in FAT",
                 cluster,
@@ -870,6 +883,7 @@ impl FatVolume {
             );
             self.update_fat(controller, cluster, new_cluster)?;
         }
+        #[cfg(feature = "log")]
         trace!(
             "Finding next free between {:?}..={:?}",
             new_cluster,
@@ -890,6 +904,7 @@ impl FatVolume {
                 }
                 Err(e) => return Err(e),
             };
+        #[cfg(feature = "log")]
         debug!("Next free cluster is {:?}", self.next_free_cluster);
         if let Some(ref mut number_free_cluster) = self.free_clusters_count {
             *number_free_cluster -= 1;
@@ -905,6 +920,7 @@ impl FatVolume {
                     .map_err(Error::DeviceError)?;
             }
         }
+        #[cfg(feature = "log")]
         debug!("All done, returning {:?}", new_cluster);
         Ok(new_cluster)
     }
